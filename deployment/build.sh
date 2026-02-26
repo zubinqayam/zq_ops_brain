@@ -125,7 +125,7 @@ run_tests() {
     cd "$PROJECT_ROOT"
     
     # Frontend tests
-    npm run test 2>/dev/null || log_warn "No frontend tests configured"
+    npm run test || { log_error "Frontend tests failed."; exit 1; }
     
     # Rust tests
     cd src-tauri
