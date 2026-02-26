@@ -2,9 +2,9 @@
 
 **Sovereign AI Operations Platform**
 
-[![Version](https://img.shields.io/badge/version-1.0.0--Dv1-rose)](https://github.com/yourrepo/zq-ops-brain)
+[![Version](https://img.shields.io/badge/version-1.0.0--Dv1-rose)](https://github.com/zq-ops-brain/zq-ops-brain)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
-[![Build](https://img.shields.io/github/actions/workflow/status/yourrepo/zq-ops-brain/mobile-release.yml)](https://github.com/yourrepo/zq-ops-brain/actions)
+[![Build](https://img.shields.io/github/actions/workflow/status/zq-ops-brain/zq-ops-brain/mobile-release.yml)](https://github.com/zq-ops-brain/zq-ops-brain/actions)
 
 ---
 
