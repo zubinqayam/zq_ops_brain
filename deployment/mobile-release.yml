@@ -100,9 +100,6 @@ jobs:
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi
 
-      - name: Install cargo-ndk
-        run: cargo install cargo-ndk
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -112,22 +109,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Android APK (ARM64)
-        run: |
-          cd src-tauri
-          cargo ndk -t aarch64-linux-android -o ../android/app/src/main/jniLibs build --release
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
-
-      - name: Build with Gradle
-        run: |
-          cd android
-          ./gradlew assembleRelease
+      - name: Build Android APK
+        run: npm run tauri android build -- --release
 
       - name: Sign APK
         uses: r0adkll/sign-android-release@v1
         with:
-          releaseDirectory: android/app/build/outputs/apk/release
+          releaseDirectory: src-tauri/gen/android/app/build/outputs/apk/release
           signingKeyBase64: ${{ secrets.SIGNING_KEY_BASE64 }}
           alias: ${{ secrets.KEY_ALIAS }}
           keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
@@ -137,13 +125,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zq-ops-brain-android
-          path: android/app/build/outputs/apk/release/*-signed.apk
+          path: src-tauri/gen/android/app/build/outputs/apk/release/*-signed.apk
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
-          files: android/app/build/outputs/apk/release/*-signed.apk
+          files: src-tauri/gen/android/app/build/outputs/apk/release/*-signed.apk
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
