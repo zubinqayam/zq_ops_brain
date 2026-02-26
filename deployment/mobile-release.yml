@@ -1,0 +1,257 @@
+# ZQ Ops Brain - GitHub Actions Workflow
+# Mobile Release Pipeline for Android APK
+
+name: Mobile Release
+
+on:
+  push:
+    branches: [main, release/*]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ============================================
+  # Code Quality & Security Checks
+  # ============================================
+  quality-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+        working-directory: ./src-tauri
+
+      - name: Run Clippy lints
+        run: cargo clippy --all-targets --all-features -- -D warnings
+        working-directory: ./src-tauri
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run type-check
+
+  # ============================================
+  # Security Audit
+  # ============================================
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run security audit
+        run: cargo audit
+        working-directory: ./src-tauri
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+
+  # ============================================
+  # Android Build
+  # ============================================
+  build-android:
+    needs: [quality-checks, security-audit]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Android APK (ARM64)
+        run: |
+          cd src-tauri
+          cargo ndk -t aarch64-linux-android -o ../android/app/src/main/jniLibs build --release
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+
+      - name: Build with Gradle
+        run: |
+          cd android
+          ./gradlew assembleRelease
+
+      - name: Sign APK
+        uses: r0adkll/sign-android-release@v1
+        with:
+          releaseDirectory: android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.SIGNING_KEY_BASE64 }}
+          alias: ${{ secrets.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zq-ops-brain-android
+          path: android/app/build/outputs/apk/release/*-signed.apk
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: android/app/build/outputs/apk/release/*-signed.apk
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================
+  # Desktop Build (Windows)
+  # ============================================
+  build-windows:
+    needs: [quality-checks, security-audit]
+    runs-on: windows-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows executable
+        run: npm run tauri build -- --target x86_64-pc-windows-msvc
+
+      - name: Sign executable
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $pfxPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          $certBytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+          [IO.File]::WriteAllBytes($pfxPath, $certBytes)
+          $securePassword = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $importedCert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
+          $exePath = "src-tauri/target/x86_64-pc-windows-msvc/release/ZQ Ops Brain.exe"
+          Set-AuthenticodeSignature -FilePath $exePath -Certificate $importedCert -TimestampServer "http://timestamp.digicert.com"
+          Remove-Item $pfxPath -Force -ErrorAction Stop
+          Remove-Item "Cert:\CurrentUser\My\$($importedCert.Thumbprint)" -Force
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zq-ops-brain-windows
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/*.exe
+
+      - name: Add to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: src-tauri/target/x86_64-pc-windows-msvc/release/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================
+  # Update Manifest Generation
+  # ============================================
+  update-manifest:
+    needs: [build-android, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate update manifest
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          cat > update.json << EOF
+          {
+            "version": "$VERSION",
+            "notes": "See release notes for details",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "aarch64-linux-android": {
+                "signature": "",
+                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/zq-ops-brain-$VERSION-aarch64.apk"
+              },
+              "x86_64-pc-windows-msvc": {
+                "signature": "",
+                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/zq-ops-brain-$VERSION-x64.exe"
+              }
+            }
+          }
+          EOF
+
+      - name: Sign manifest
+        run: |
+          echo "${{ secrets.MANIFEST_SIGNING_KEY }}" | base64 -d > private.key
+          openssl dgst -sha256 -sign private.key -out update.json.sig update.json
+          base64 update.json.sig > update.json.sig.b64
+
+      - name: Upload manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-manifest
+          path: |
+            update.json
+            update.json.sig.b64

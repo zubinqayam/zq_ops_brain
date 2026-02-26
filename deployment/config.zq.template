@@ -1,0 +1,73 @@
+# ZQ Ops Brain Configuration Template
+# Copy to config.zq and customize for your deployment
+# Sign with: ./scripts/sign-config.sh config.zq
+
+[application]
+name = "ZQ Ops Brain"
+version = "1.0.0-Dv1"
+codename = "Golden Spike"
+build_date = "2025-02-26"
+license = "Apache-2.0"
+
+[security]
+# ed25519 public key for config signature verification
+# Generate with: openssl genpkey -algorithm ed25519 -out config.key
+public_key = "YOUR_ED25519_PUBLIC_KEY_HERE"
+
+# SQLCipher encryption settings
+encryption_enabled = true
+page_size = 4096
+kdf_iter = 256000
+
+# Hardware binding
+hwid_binding = true
+hwid_salt = "YOUR_HWID_SALT_HERE"
+
+[features]
+# Core modules
+chatbot_enabled = true
+voice_commands = true
+offline_mode = true
+auto_update = true
+
+# AI providers
+[features.ai_providers]
+openai = true
+gemini = true
+local_llm = true
+
+[budget]
+# Daily spending limit in OMR
+daily_limit = 5.000
+
+# Cost per operation (OMR)
+[task_costs]
+create_task = 0.010
+update_task = 0.005
+complete_task = 0.005
+create_project = 0.015
+schedule_event = 0.010
+add_reminder = 0.005
+execute_script = 0.050
+api_call = 0.001
+
+[notifications]
+enabled = true
+reminder_default_minutes = 15
+
+[update]
+# Update server configuration
+manifest_url = "https://your-domain.com/updates/update.json"
+check_interval_hours = 24
+force_update_major = true
+
+[logging]
+level = "info"
+max_files = 7
+sanitize_secrets = true
+
+[compliance]
+# Zero-knowledge audit settings
+audit_enabled = true
+hash_algorithm = "sha256"
+daily_merkle_root = true

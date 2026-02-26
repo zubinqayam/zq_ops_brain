@@ -1,14 +1,13 @@
 {
-  "name": "my-app",
+  "name": "zq-ops-brain",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0-Dv1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "type-check": "tsc -b --pretty false"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
