@@ -114,7 +114,7 @@ CREATE TABLE tasks (
     title TEXT NOT NULL,
     description TEXT,
     project_id TEXT REFERENCES projects(id),
-    priority INTEGER DEFAULT 1,
+    priority TEXT DEFAULT 'low',
     status TEXT DEFAULT 'todo',
     due_datetime INTEGER,
     created_at INTEGER DEFAULT (unixepoch()),
