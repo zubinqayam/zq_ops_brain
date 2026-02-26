@@ -181,11 +181,19 @@ jobs:
 
       - name: Sign executable
         shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
-          $cert = New-SelfSignedCertificate -Subject "CN=ZQ AI Logic" -Type CodeSigning -CertStoreLocation Cert:\CurrentUser\My
-          $certPath = "Cert:\CurrentUser\My\$($cert.Thumbprint)"
+          $pfxPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          $certBytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+          [IO.File]::WriteAllBytes($pfxPath, $certBytes)
+          $securePassword = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $importedCert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
           $exePath = "src-tauri/target/x86_64-pc-windows-msvc/release/ZQ Ops Brain.exe"
-          Set-AuthenticodeSignature -FilePath $exePath -Certificate (Get-Item $certPath)
+          Set-AuthenticodeSignature -FilePath $exePath -Certificate $importedCert -TimestampServer "http://timestamp.digicert.com"
+          Remove-Item $pfxPath -Force -ErrorAction Stop
+          Remove-Item "Cert:\CurrentUser\My\$($importedCert.Thumbprint)" -Force
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
