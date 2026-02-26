@@ -1,7 +1,7 @@
 {
   "name": "zq-ops-brain",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0-Dv1",
   "type": "module",
   "scripts": {
     "dev": "vite",
