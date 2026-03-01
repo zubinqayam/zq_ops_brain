@@ -166,9 +166,3 @@ jobs:
           echo "### Installation Instructions:" >> $GITHUB_STEP_SUMMARY
           echo "**Windows:** Download .exe → Double click → Follow installer" >> $GITHUB_STEP_SUMMARY
           echo "**Android:** Download .apk → Allow 'Unknown Sources' → Install" >> $GITHUB_STEP_SUMMARY
-'''
-
-print(workflow_content)
-print("\n" + "="*80)
-print("WORKFLOW FILE CREATED")
-print("="*80)
