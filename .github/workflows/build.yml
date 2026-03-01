@@ -1,5 +1,4 @@
-# Creating the GitHub Actions workflow content
-workflow_content = '''name: Build ZQ Ops Brain - EXE & APK
+# Creating the GitHub Actions workflow content Build ZQ Ops Brain - EXE & APK
 
 on:
   push:
